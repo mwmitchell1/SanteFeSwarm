@@ -1,0 +1,104 @@
+Swarm build command:
+
+first:
+
+sudo yum -y install gcc-objc
+sudo yum install gperf
+
+./configure --with-tclconfig=/usr/local/lib --with-tkconfig=/usr/local/lib --without-jdkdir
+
+
+
+Problems with building Tcl/TK:
+
+./configure --with-tcl=/usr/lib64/ --without-x
+
+
+You're working with an elderly codebase, so some surgery is required. Alas.
+
+The four offending declarations in bltNsUtil.h need to be removed as Tcl now declares them properly; Tcl_FindCommand, Tcl_CreateNamespace, Tcl_FindNamespace and Tcl_Export are part of Tcl's public API and have been for years. (The problem declarations are on lines 50, 67, 72, and 75, plus probably one or two lines further in each case.)
+
+Also, you're recommended to not use sudo while doing the build itself, but rather just when doing the install afterwards. Mere compilation of the code shouldn't require elevated permissions.
+
+
+\
+ Problems with Building BLT 2.4z
+
+
+Compilation failure in bltTree on 64-bit machines
+
+Often blt 2.4z can fail to compile on 64-bit machines
+
+bltTree.c:2690: error: START_LOGSIZE undeclared (first use in this function)
+
+This is due to misordered statements in blt2.4z/src/bltTree.c, which must undergo the following rearrangement.
+
+@@ -95,17 +95,16 @@ static Value *TreeNextValue _ANSI_ARGS_(
+  */
+
+ #define REBUILD_MULTIPLIER	3
++#define START_LOGSIZE		5 /* Initial hash table size is 32. */
++#define MAX_LIST_VALUES		20 /* Convert to hash table when node
++				    * value list gets bigger than this
++				    * many values. */
+
+ #if (SIZEOF_VOID_P == 8)
+ #define RANDOM_INDEX(i)		HashOneWord(mask, downshift, i)
+ #define BITSPERWORD		64
+ #else
+
+-#define START_LOGSIZE		5 /* Initial hash table size is 32. */
+-#define MAX_LIST_VALUES		20 /* Convert to hash table when node
+-				    * value list gets bigger than this
+-				    * many values. */
+-
+ /*
+  * The following macro takes a preliminary integer hash value and
+  * produces an index into a hash tables bucket list.  The idea is
+
+GCC:
+
+--- a/gcc/config/i386/linux-unwind.h	2011-01-03 20:52:22.000000000 +0000
++++ b/gcc/config/i386/linux-unwind.h	2012-07-06 12:23:51.562859470 +0100
+@@ -133,9 +133,9 @@
+     {
+       struct rt_sigframe {
+ 	int sig;
+-	struct siginfo *pinfo;
++	siginfo_t *pinfo;
+ 	void *puc;
+-	struct siginfo info;
++	siginfo_t info;
+ 	struct ucontext uc;
+       } *rt_ = context->cfa;
+       /* The void * cast is necessary to avoid an aliasing warning.
+
+../configure --enable-languages=c,c++,objc --prefix=/usr/local/gcc4
+
+
+Many people, including me, get this enormous runtime error after properly installing tcl/tk:
+
+/home/me/dev/tk8.4.0/lib/tk8.4/tk.tcl: no event type or button # or keysym
+  no event type or button # or keysym                                            
+      while executing                                                            
+  "bind Listbox <MouseWheel> {
+      %W yview scroll [expr {- (%D / 120) * 4}] units
+  }"                                                
+      (file "/home/me/dev/tk8.4.0/lib/tk8.4/listbox.tcl" line 182)          
+      invoked from within    
+  "source /home/me/dev/tk8.4.0/lib/tk8.4/listbox.tcl"                        
+      (in namespace eval "::" script line 1)
+      invoked from within                    
+  "namespace eval :: [list source [file join $::tk_library $file.tcl]]"
+      (procedure "SourceLibFile" line 2)
+      invoked from within                
+  "SourceLibFile listbox"            
+      (in namespace eval "::tk" script line 4)      
+      invoked from within ....
+
+The proximate cause is "MouseWheel" event type is not recognized.  One fix, if you don't care about the stupid MouseWheel, is just to comment out (with "#") the entire "bind" for MouseWheel events.  This happens at lines 178 through 198 of "listbox.tcl", and lines 453 through 474 of "text.tcl".  Both files in the tk support directory path listed in the error message, here tk8.4.0/lib/tk8.4/listbox.tcl.
+
+I commented these out, and now have working tk applications!  
+
+The ultimate cause of this error is unknown, possibly due to a mismatch between Tcl/Tk at install time or run time.  I got it building the X11 version of Tk (in "unix/") on a Mac OS X machine, but commenting out the "MouseWheel" sections fixed it. 
+
